@@ -1,4 +1,5 @@
 const { Resend } = require("resend");
+const Brevo = require("@getbrevo/brevo");
 const logger = require("../config/logger");
 
 // ── HTML template ─────────────────────────────────────────────────────────────
@@ -55,7 +56,27 @@ const sendSummaryEmail = async ({ recipient, summary, filename, rowCount }) => {
   const html = buildHTML(summary, filename, rowCount);
   const text = buildPlainText(summary, filename, rowCount);
 
-  // ── 1. Resend (HTTPS API — works on all hosting platforms) ───────────────
+  // ── 1. Brevo (HTTPS API — 300 emails/day free, sends to ANY address) ──────
+  if (process.env.BREVO_API_KEY) {
+    const apiInstance = new Brevo.TransactionalEmailsApi();
+    apiInstance.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
+
+    const sendSmtpEmail = new Brevo.SendSmtpEmail();
+    sendSmtpEmail.subject = subject;
+    sendSmtpEmail.htmlContent = html;
+    sendSmtpEmail.textContent = text;
+    sendSmtpEmail.sender = {
+      name: process.env.FROM_NAME || "Rabbitt AI",
+      email: process.env.FROM_EMAIL || "krishbahukhandi35@gmail.com",
+    };
+    sendSmtpEmail.to = [{ email: recipient }];
+
+    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
+    logger.info(`📧 Email delivered via Brevo → ${recipient} | messageId: ${result.messageId}`);
+    return true;
+  }
+
+  // ── 2. Resend (HTTPS API — free tier: only sends to signup email) ─────────
   if (process.env.RESEND_API_KEY) {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const from = process.env.FROM_EMAIL
@@ -79,8 +100,8 @@ const sendSummaryEmail = async ({ recipient, summary, filename, rowCount }) => {
     return true;
   }
 
-  // ── 2. Dev fallback — log to console ────────────────────────────────────
-  logger.warn("No RESEND_API_KEY configured — printing to console (dev mode).");
+  // ── 3. Dev fallback — log to console ─────────────────────────────────────
+  logger.warn("No email provider configured — printing to console (dev mode).");
   logger.info(`\n${"=".repeat(60)}\n📧 [DEV] To: ${recipient}\nSubject: ${subject}\n${text}\n${"=".repeat(60)}`);
   return false;
 };
