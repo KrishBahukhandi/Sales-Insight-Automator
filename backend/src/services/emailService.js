@@ -19,11 +19,14 @@ const createTransporter = () => {
   if (process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: parseInt(process.env.SMTP_PORT || "587"),
-      secure: false,
+      port: parseInt(process.env.SMTP_PORT || "465"),
+      secure: true,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD,
+      },
+      tls: {
+        rejectUnauthorized: false,
       },
     });
   }
@@ -92,7 +95,16 @@ const sendSummaryEmail = async ({ recipient, summary, filename, rowCount }) => {
     return false;
   }
 
-  await transporter.sendMail({
+  // Verify SMTP connection before sending
+  try {
+    await transporter.verify();
+    logger.info("✅ SMTP connection verified successfully");
+  } catch (verifyErr) {
+    logger.error(`❌ SMTP verify failed: ${verifyErr.message} | code: ${verifyErr.code} | response: ${verifyErr.response}`);
+    throw verifyErr;
+  }
+
+  const info = await transporter.sendMail({
     from: `"${process.env.FROM_NAME || "Rabbitt AI"}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
     to: recipient,
     subject,
@@ -100,7 +112,7 @@ const sendSummaryEmail = async ({ recipient, summary, filename, rowCount }) => {
     html,
   });
 
-  logger.info(`📧 Email delivered → ${recipient}`);
+  logger.info(`📧 Email delivered → ${recipient} | messageId: ${info.messageId}`);
   return true;
 };
 
