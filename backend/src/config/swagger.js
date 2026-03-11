@@ -33,12 +33,12 @@ generates AI-powered executive summaries, and delivers them via email.
     },
     servers: [
       {
-        url: process.env.API_BASE_URL || "http://localhost:5000",
-        description: "Local / Development",
+        url: "https://sales-insight-automator-2fjh.onrender.com",
+        description: "Production (Render)",
       },
       {
-        url: "https://your-app.onrender.com",
-        description: "Production (Render)",
+        url: process.env.API_BASE_URL || "http://localhost:5000",
+        description: "Local / Development",
       },
     ],
     components: {

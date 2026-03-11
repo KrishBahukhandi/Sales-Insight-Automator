@@ -2,7 +2,17 @@
 
 > **Rabbitt AI** · MERN Stack · Quick-Response Sprint
 
-A full-stack containerized application that ingests CSV/Excel sales data, generates an AI-powered executive brief via **Groq (Llama 3)**, and delivers it directly to a recipient's inbox. Built on the **MERN stack** — MongoDB, Express.js, React, Node.js.
+A full-stack containerized application that ingests CSV/Excel sales data, generates an AI-powered executive brief via **Groq (Llama 3.3-70B)**, and delivers it directly to a recipient's inbox. Built on the **MERN stack** — MongoDB, Express.js, React, Node.js.
+
+### 🌐 Live Deployment
+| Service | URL |
+|---|---|
+| **Frontend (Vercel)** | https://sales-insight-automator-gold.vercel.app |
+| **Backend API (Render)** | https://sales-insight-automator-2fjh.onrender.com |
+| **Swagger Docs** | https://sales-insight-automator-2fjh.onrender.com/api/docs |
+| **Health Check** | https://sales-insight-automator-2fjh.onrender.com/api/health |
+
+> ⚠️ Free Render instance spins down after inactivity — first request may take ~30s to wake up.
 
 ---
 
