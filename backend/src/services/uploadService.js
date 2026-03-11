@@ -121,14 +121,19 @@ const uploadAndAnalyze = async (req, res, next) => {
     logger.info(`Generating AI summary for ${rowCount} rows...`);
     const { summary, provider } = await generateSalesSummary(context, req.file.originalname);
 
-    // 4. Send email
+    // 4. Send email (non-fatal — log and continue if SMTP fails)
     logger.info(`Sending email to ${email}...`);
-    const emailSent = await sendSummaryEmail({
-      recipient: email,
-      summary,
-      filename: req.file.originalname,
-      rowCount,
-    });
+    let emailSent = false;
+    try {
+      emailSent = await sendSummaryEmail({
+        recipient: email,
+        summary,
+        filename: req.file.originalname,
+        rowCount,
+      });
+    } catch (emailErr) {
+      logger.warn(`Email delivery failed (non-fatal): ${emailErr.message}`);
+    }
 
     // 5. Persist to MongoDB (non-fatal if DB is unavailable)
     let reportId = null;
@@ -154,11 +159,14 @@ const uploadAndAnalyze = async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: `Summary generated and sent to ${email}`,
+      message: emailSent
+        ? `Summary generated and sent to ${email}`
+        : `Summary generated (email delivery failed — check SMTP config)`,
       recipient: email,
       summaryPreview: summary.slice(0, 500) + (summary.length > 500 ? "..." : ""),
       rowsAnalyzed: rowCount,
       columnsDetected: columns,
+      emailDelivered: emailSent,
       reportId,
     });
   } catch (err) {
