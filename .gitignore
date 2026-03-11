@@ -1,0 +1,9 @@
+.env
+*.env.local
+node_modules/
+frontend/dist/
+backend/coverage/
+*.log
+.DS_Store
+.vscode/
+.idea/
