@@ -1,5 +1,5 @@
+const nodemailer = require("nodemailer");
 const { Resend } = require("resend");
-const Brevo = require("@getbrevo/brevo");
 const logger = require("../config/logger");
 
 // ── HTML template ─────────────────────────────────────────────────────────────
@@ -56,35 +56,57 @@ const sendSummaryEmail = async ({ recipient, summary, filename, rowCount }) => {
   const html = buildHTML(summary, filename, rowCount);
   const text = buildPlainText(summary, filename, rowCount);
 
-  // ── 1. Brevo (HTTPS API — 300 emails/day free, sends to ANY address) ──────
-  if (process.env.BREVO_API_KEY) {
-    const apiInstance = new Brevo.TransactionalEmailsApi();
-    apiInstance.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
+  // ── 1. Gmail via service shortcut (works on Render — uses HTTPS internally) ─
+  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
 
-    const sendSmtpEmail = new Brevo.SendSmtpEmail();
-    sendSmtpEmail.subject = subject;
-    sendSmtpEmail.htmlContent = html;
-    sendSmtpEmail.textContent = text;
-    sendSmtpEmail.sender = {
-      name: process.env.FROM_NAME || "Rabbitt AI",
-      email: process.env.FROM_EMAIL || "krishbahukhandi35@gmail.com",
-    };
-    sendSmtpEmail.to = [{ email: recipient }];
+    const info = await transporter.sendMail({
+      from: `"${process.env.FROM_NAME || "Rabbitt AI"}" <${process.env.GMAIL_USER}>`,
+      to: recipient,
+      subject,
+      text,
+      html,
+    });
 
-    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
-    logger.info(`📧 Email delivered via Brevo → ${recipient} | messageId: ${result.messageId}`);
+    logger.info(`📧 Email delivered via Gmail → ${recipient} | messageId: ${info.messageId}`);
     return true;
   }
 
-  // ── 2. Resend (HTTPS API — free tier: only sends to signup email) ─────────
+  // ── 2. Brevo SMTP Relay fallback ──────────────────────────────────────────
+  if (process.env.BREVO_API_KEY) {
+    const transporter = nodemailer.createTransport({
+      host: "smtp-relay.brevo.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.FROM_EMAIL,
+        pass: process.env.BREVO_API_KEY,
+      },
+    });
+
+    const info = await transporter.sendMail({
+      from: `"${process.env.FROM_NAME || "Rabbitt AI"}" <${process.env.FROM_EMAIL}>`,
+      to: recipient,
+      subject,
+      text,
+      html,
+    });
+
+    logger.info(`📧 Email delivered via Brevo SMTP → ${recipient} | messageId: ${info.messageId}`);
+    return true;
+  }
+
+  // ── 2. Resend fallback (only sends to signup email on free tier) ──────────
   if (process.env.RESEND_API_KEY) {
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const from = process.env.FROM_EMAIL
-      ? `${process.env.FROM_NAME || "Rabbitt AI"} <${process.env.FROM_EMAIL}>`
-      : "Rabbitt AI <onboarding@resend.dev>";
-
     const { data, error } = await resend.emails.send({
-      from,
+      from: `${process.env.FROM_NAME || "Rabbitt AI"} <onboarding@resend.dev>`,
       to: [recipient],
       subject,
       html,
@@ -100,7 +122,7 @@ const sendSummaryEmail = async ({ recipient, summary, filename, rowCount }) => {
     return true;
   }
 
-  // ── 3. Dev fallback — log to console ─────────────────────────────────────
+  // ── 3. Dev fallback ───────────────────────────────────────────────────────
   logger.warn("No email provider configured — printing to console (dev mode).");
   logger.info(`\n${"=".repeat(60)}\n📧 [DEV] To: ${recipient}\nSubject: ${subject}\n${text}\n${"=".repeat(60)}`);
   return false;
